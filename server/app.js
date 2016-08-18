@@ -13,5 +13,5 @@ app.get('/api/planets', function(req, res) {
 });
 
 app.listen(3000, function() {
-    console.log('Server started on port 3000.');
+    console.log('Server started on port 3000. Please open http://localhost:3000/ in your browser.');
 });
