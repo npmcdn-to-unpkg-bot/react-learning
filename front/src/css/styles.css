@@ -1,0 +1,22 @@
+* {
+    outline: none !important;
+}
+
+.content {
+    width: 900px;
+    margin: 20px auto;
+}
+
+.chart-content {
+    height: 500px;
+}
+
+.filter-box {
+    margin: 10px 0;
+    clear: both;
+}
+
+.filter-box .btn-group {
+    display: block;
+    margin: 5px 0;
+}

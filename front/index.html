@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ReactJS Demo</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <link rel="stylesheet" type="text/css" href="/static/css/styles.css"/>
+    <script src="https://npmcdn.com/react@15.3.0/dist/react.js"></script>
+    <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script src="https://npmcdn.com/jquery@3.1.0/dist/jquery.min.js"></script>
+    <script src="https://npmcdn.com/remarkable@1.6.2/dist/remarkable.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+    <script src="//www.amcharts.com/lib/3/amcharts.js"></script>
+    <script src="//www.amcharts.com/lib/3/serial.js"></script>
+    <script src="//www.amcharts.com/lib/3/themes/light.js"></script>
+</head>
+<body>
+    <div class="content" id="content"></div>
+</body>
+
+<script type="text/babel">
+
+    const chartColors = ['#FF0F00', '#FF6600', '#FF9E01', '#FCD202', '#F8FF01', '#B0DE09', '#04D215', '#0D8ECF', '#0D52D1', '#2A0CD0', '#8A0CCF', '#CD0D74'];
+
+    let AmChartDefaultConfig = {
+        "theme": "light",
+        "type": "serial",
+        "startDuration": 2,
+        "depth3D": 20,
+        "angle": 30,
+        "chartCursor": {
+            "categoryBalloonEnabled": false,
+            "cursorAlpha": 0,
+            "zoomable": false
+        },
+        "categoryField": "planet",
+        "categoryAxis": {
+            "gridPosition": "start",
+            "labelRotation": 90
+        },
+        "export": {
+            "enabled": true
+        }
+
+    };
+
+    class Chart extends React.Component {
+
+        getSelectedParamValues() {
+            return this.props.data.find(info => {
+                return info.col.id === this.props.selectedParam.id
+            })
+        }
+
+        chartDataGet() {
+            let paramValues = this.getSelectedParamValues();
+            if (!paramValues) return false;
+            return this.props.selectedPlanets.map((planetId) => {
+                return {
+                    planet: this.props.planetsList.find(planet => {
+                        return planet.id === planetId
+                    }).name,
+                    value: paramValues.v[planetId],
+                    color: chartColors[planetId % chartColors.length]
+                };
+            })
+        }
+
+        componentDidUpdate() {
+            let data = this.chartDataGet();
+            if (!data) return;
+            this.chart = AmCharts.makeChart("chartdiv", Object.assign({}, AmChartDefaultConfig, {
+                "dataProvider": data,
+                "graphs": [{
+                    "balloonText": "[[category]]: <b>[[value]]</b>",
+                    "fillColorsField": "color",
+                    "fillAlphas": 1,
+                    "lineAlpha": 0.1,
+                    "type": "column",
+                    "valueField": "value"
+
+                }],
+                "valueAxes": [{
+                    "position": "left",
+                    "title": this.props.selectedParam.label
+                }]
+            }));
+        }
+
+        render() {
+            return (
+                    <div className="chart panel-body">
+                        <div className="chart-content" id="chartdiv"></div>
+                    </div>
+            );
+        }
+
+    }
+
+    class ButtonsBox extends React.Component {
+
+        isButtonSelected() {}
+
+        handleClick(key) {
+            this.props.handleClick(key);
+        }
+
+        render() {
+            let paramsNodes = this.props.buttonsList.map(param => {
+                return (
+                        <label className={'btn btn-default' + (this.isButtonSelected(param.id) ? ' active' : '')} key={param.id} onClick={this.handleClick.bind(this, param.id)}>
+                            <input type={this.props.type} name="params" value={param.id} autoComplete="off"/>{param.name}
+                        </label>
+                )
+            });
+
+            return (
+                    <div className="paramsBox filter-box">
+                        <span className="label label-primary">{this.props.scaleName}</span>
+                        <div className="btn-group" data-toggle="buttons">
+                            {paramsNodes}
+                        </div>
+                        <div className="clearfix"></div>
+                    </div>
+            );
+        }
+
+    }
+
+    class ParamsBox extends ButtonsBox {
+        isButtonSelected(paramId) {
+            return paramId === this.props.selectedParam.id;
+        }
+    }
+
+    class PlanetsBox extends ButtonsBox {
+        isButtonSelected(paramId) {
+            return this.props.selectedPlanets.indexOf(paramId) !== -1;
+        }
+    }
+
+    class MainLayout extends React.Component {
+
+        constructor(props) {
+            super(props);
+            this.state = {
+                data: [],
+                planets: [],
+                params: [],
+                selectedPlanets: [],
+                selectedParam: {}
+            };
+            window.a= this;
+        }
+
+        componentDidMount() {
+            Promise.resolve($.ajax('/api/planets')).then(data => {
+                const params = this._parseParams(data.col);
+                const planets = this._parsePlanets(data.col);
+                this.setState({
+                    data: data.col,
+                    planets: planets,
+                    params: params,
+                    selectedParam: params[0],
+                    selectedPlanets: planets.map(planet => planet.id)
+                });
+            })
+        }
+
+        onParamChanged(paramId) {
+            this.setState({
+                selectedParam: this.state.params.find(info => {
+                    return info.id === paramId;
+                })
+            });
+        }
+
+        onPlanetToggle(planetId) {
+            let position = this.state.selectedPlanets.indexOf(planetId);
+            let planetsCopy = this.state.selectedPlanets.slice();
+            if (position === -1) {
+                planetsCopy.push(planetId);
+                planetsCopy.sort();
+            } else {
+                planetsCopy.splice(position, 1)
+            }
+            this.setState({
+                selectedPlanets: planetsCopy
+            });
+        }
+
+        _parsePlanets(data) {
+            return data.find(info => {
+                return info.col.id === 'name';
+            }).v.map((value, index) => {
+                return {
+                    id: index,
+                    name: value
+                }
+            })
+        }
+
+        _parseParams(data) {
+            return data.filter(info => {
+                return info.col.id !== 'name'
+            }).map(info => {
+                info.col.name = info.col.label.replace(/\(.*\)/, '');
+                return info.col;
+            })
+        }
+
+        render() {
+            return (
+                    <div className="mainLayout panel panel-default">
+                        <div className="panel-heading">
+                            <h3 className="panel-title">Planets statistics</h3>
+                        </div>
+                        <Chart selectedParam={this.state.selectedParam} selectedPlanets={this.state.selectedPlanets} data={this.state.data} planetsList={this.state.planets}/>
+                        <div className="panel-footer">
+                            <ParamsBox buttonsList={this.state.params} selectedParam={this.state.selectedParam} handleClick={this.onParamChanged.bind(this)} scaleName="Parameters" type="radio"/>
+                            <PlanetsBox buttonsList={this.state.planets} selectedPlanets={this.state.selectedPlanets} handleClick={this.onPlanetToggle.bind(this)} scaleName="Planets" type="checkbox"/>
+                            <div className="clearfix"></div>
+                        </div>
+                    </div>
+            );
+        }
+
+    }
+
+    ReactDOM.render(
+            <MainLayout url="/api/planets"/>,
+            document.getElementById('content')
+    );
+
+</script>
+
+</html>
